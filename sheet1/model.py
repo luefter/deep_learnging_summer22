@@ -159,12 +159,9 @@ def train_loop(dataloader, model, loss_fn, optimizer):#,tracker:Tracker):
         loss_records.append(loss.item())
 
         
-        if batch % 100 == 0:
+        if batch*len(X) % 1280 == 0:
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-            # record = tracker.spawn_record()
-            # record.batch = batch
-            # record.loss = loss
 
     return loss_records
 
@@ -232,13 +229,16 @@ loss_fn = nn.CrossEntropyLoss()
 #     pickle.dump(loss_records,file, protocol=pickle.HIGHEST_PROTOCOL)
 
 # TASK 2
-batch_sizes = [1,64,128]
-optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+batch_sizes = [32]
 loss_records = dict()
 for batch_size in batch_sizes:
     model = ConvNetwork().to(device)
+    optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
     logger.info(f"Start training for batch size {batch_size}")
     loss_records[batch_size] = {"train":[],"test":[]}
+
+    train_dataloader = DataLoader(training_data, batch_size=batch_size)
+    test_dataloader = DataLoader(test_data, batch_size=64)
     
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}\n-------------------------------")
