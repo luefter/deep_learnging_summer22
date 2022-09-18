@@ -1,9 +1,10 @@
 import os
 import torch
+import pickle
 from torch import nn
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
-
+from loguru import logger
 import torch
 from torch.utils.data import Dataset
 from torchvision import datasets
@@ -11,7 +12,6 @@ from torchvision.transforms import ToTensor
 import matplotlib.pyplot as plt
 
 from torch.nn import Conv2d,MaxPool2d
-from tracking_and_visualization import TrackingRecord,Tracker
 
 # define network
 class NeuralNetwork(nn.Module):
@@ -139,8 +139,10 @@ labels_map = {
 
 
 
-def train_loop(dataloader, model, loss_fn, optimizer,tracker:Tracker):
+
+def train_loop(dataloader, model, loss_fn, optimizer):#,tracker:Tracker):
     size = len(dataloader.dataset)
+    loss_records = []
     for batch, (X, y) in enumerate(dataloader):
         # Load into device
         X,y = X.to(device),y.to(device)
@@ -154,35 +156,39 @@ def train_loop(dataloader, model, loss_fn, optimizer,tracker:Tracker):
         loss.backward()
         optimizer.step()
         
+        loss_records.append(loss.item())
 
+        
         if batch % 100 == 0:
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
-            record = tracker.spawn_record()
-            record.batch = batch
-            record.loss = loss
+            # record = tracker.spawn_record()
+            # record.batch = batch
+            # record.loss = loss
 
+    return loss_records
 
-
-
+        
 def test_loop(dataloader, model, loss_fn):
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     test_loss, correct = 0, 0
+    loss_records = []
 
     with torch.no_grad():
         for X, y in dataloader:
             X,y = X.to(device),y.to(device) 
             pred = model(X)
-            test_loss += loss_fn(pred, y).item()
+            test_loss_batch = loss_fn(pred, y).item()
+            test_loss += test_loss_batch
+            loss_records.append(test_loss_batch)
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
 
     test_loss /= num_batches
     correct /= size
     print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
-
-    loss_fn = nn.CrossEntropyLoss()
+    return loss_records
 
 
 
@@ -194,24 +200,52 @@ print(f"Using {device} device")
 # initialize model
 # model = NeuralNetwork().to(device)
 model = ConvNetwork().to(device)
-
-
 learning_rate = 1e-3
 batch_size = 64
-epochs = 5
+epochs = 1
 
 # Initialize the loss function
 loss_fn = nn.CrossEntropyLoss()
 #optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+#optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
+# TASK 1
+# optimizers = [torch.optim.Adam,torch.optim.SGD]
+# loss_records = dict()
+# for optimizer in optimizers:
+#     opt_name = optimizer.__name__
+#     loss_records[opt_name] = {"train":[],"test":[]}
+#     logger.info(f"Start training for {opt_name}")
 
+#     model = ConvNetwork().to(device)
+#     optimizer = optimizer(model.parameters(), lr=learning_rate)
 
-epochs = 1
-tracker = Tracker(optimizer_name="adam",phase="training")
-for epoch in range(epochs):
-    print(f"Epoch {epoch+1}\n-------------------------------")
-    tracker.epoch = epoch
-    train_loop(train_dataloader, model, loss_fn, optimizer,tracker=tracker)
-    test_loop(test_dataloader, model, loss_fn)
-print("Done!")
+#     for epoch in range(epochs):
+#         print(f"Epoch {epoch+1}\n-------------------------------")
+#         train_loss_record = train_loop(train_dataloader, model, loss_fn, optimizer)
+#         loss_records[opt_name]["train"].extend(train_loss_record)
+#         test_loss_record = test_loop(test_dataloader, model, loss_fn)
+#         loss_records[opt_name]["test"].extend(test_loss_record)
+#     print("Done!")
+
+# with open('loss_records_task1.pickle', 'wb') as file:
+#     pickle.dump(loss_records,file, protocol=pickle.HIGHEST_PROTOCOL)
+
+# TASK 2
+batch_sizes = [1,64,128]
+optimizer = torch.optim.SGD(model.parameters(), lr=learning_rate)
+loss_records = dict()
+for batch_size in batch_sizes:
+    model = ConvNetwork().to(device)
+    logger.info(f"Start training for batch size {batch_size}")
+    loss_records[batch_size] = {"train":[],"test":[]}
+    
+    for epoch in range(epochs):
+        print(f"Epoch {epoch+1}\n-------------------------------")
+        train_loss_record = train_loop(train_dataloader, model, loss_fn, optimizer)
+        loss_records[batch_size]["train"].extend(train_loss_record)
+        test_loss_record = test_loop(test_dataloader, model, loss_fn)
+        loss_records[batch_size]["test"].extend(test_loss_record)
+
+with open('loss_records_task2.pickle', 'wb') as file:
+    pickle.dump(loss_records,file, protocol=pickle.HIGHEST_PROTOCOL)
