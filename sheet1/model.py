@@ -140,10 +140,11 @@ labels_map = {
 
 
 
-def train_loop(dataloader, model, loss_fn, optimizer):#,tracker:Tracker):
-    size = len(dataloader.dataset)
-    loss_records = []
-    for batch, (X, y) in enumerate(dataloader):
+def train_loop(train_dataloader,test_dataloader, model, loss_fn, optimizer):#,tracker:Tracker):
+    size = len(train_dataloader.dataset)
+    train_loss_records = []
+    test_loss_records = []
+    for batch, (X, y) in enumerate(train_dataloader):
         # Load into device
         X,y = X.to(device),y.to(device)
 
@@ -156,17 +157,17 @@ def train_loop(dataloader, model, loss_fn, optimizer):#,tracker:Tracker):
         loss.backward()
         optimizer.step()
         
-        loss_records.append(loss.item())
-
+        train_loss_records.append(loss.item())
+        test_loss_records.append(test_loop(test_dataloader,model,loss_fn))
         
         if batch*len(X) % 1280 == 0:
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
-    return loss_records
+    return train_loss_records,test_loss_records
 
         
-def test_loop(dataloader, model, loss_fn):
+def test_loop(dataloader, model, loss_fn,verbose=False):
     size = len(dataloader.dataset)
     num_batches = len(dataloader)
     test_loss, correct = 0, 0
@@ -176,16 +177,15 @@ def test_loop(dataloader, model, loss_fn):
         for X, y in dataloader:
             X,y = X.to(device),y.to(device) 
             pred = model(X)
-            test_loss_batch = loss_fn(pred, y).item()
-            test_loss += test_loss_batch
-            loss_records.append(test_loss_batch)
+            test_loss += loss_fn(pred, y).item()
             correct += (pred.argmax(1) == y).type(torch.float).sum().item()
 
     test_loss /= num_batches
     correct /= size
-    print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
+    if verbose:
+        print(f"Test Error: \n Accuracy: {(100*correct):>0.1f}%, Avg loss: {test_loss:>8f} \n")
 
-    return loss_records
+    return test_loss
 
 
 
@@ -229,7 +229,7 @@ loss_fn = nn.CrossEntropyLoss()
 #     pickle.dump(loss_records,file, protocol=pickle.HIGHEST_PROTOCOL)
 
 # TASK 2
-batch_sizes = [32]
+batch_sizes = [128]
 loss_records = dict()
 for batch_size in batch_sizes:
     model = ConvNetwork().to(device)
@@ -238,14 +238,15 @@ for batch_size in batch_sizes:
     loss_records[batch_size] = {"train":[],"test":[]}
 
     train_dataloader = DataLoader(training_data, batch_size=batch_size)
-    test_dataloader = DataLoader(test_data, batch_size=64)
+    test_dataloader = DataLoader(test_data, batch_size=512)
     
     for epoch in range(epochs):
         print(f"Epoch {epoch+1}\n-------------------------------")
-        train_loss_record = train_loop(train_dataloader, model, loss_fn, optimizer)
+        train_loss_record,test_loss_record= train_loop(train_dataloader,test_dataloader, model, loss_fn, optimizer)
         loss_records[batch_size]["train"].extend(train_loss_record)
-        test_loss_record = test_loop(test_dataloader, model, loss_fn)
         loss_records[batch_size]["test"].extend(test_loss_record)
+
+        test_loop(test_dataloader, model, loss_fn,verbose=True)
 
 with open('loss_records_task2.pickle', 'wb') as file:
     pickle.dump(loss_records,file, protocol=pickle.HIGHEST_PROTOCOL)
