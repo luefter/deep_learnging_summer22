@@ -18,7 +18,7 @@ import pickle
 
 
 # Task 2
-with open('loss_records_task2.pickle', 'rb') as file:
+with open('./sheet1/loss_records_task2.pickle', 'rb') as file:
     loss_records = pickle.load(file)
 
 fig, (ax1, ax2) = plt.subplots(1, 2)

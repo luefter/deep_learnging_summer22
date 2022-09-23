@@ -172,8 +172,8 @@ def test_loop(dataloader, model, loss_fn, verbose=False):
     return test_loss
 
 
-# get devive
-device = torch.device("mps")
+# get device
+device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using {device} device")
 
 # load data

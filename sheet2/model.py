@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import torch
+import pickle
 
 from torch import nn, optim
 from torch.nn import functional as F
@@ -17,6 +18,7 @@ Z1_RANGE = 2
 Z2_RANGE = 2
 Z1_INTERVAL = 0.2
 Z2_INTERVAL = 0.2
+loss_records = {"train": [], "test": []}
 
 # set device
 device = torch.device("mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu")
@@ -68,8 +70,7 @@ def loss_function(recon_x, x, mu, logvar):
 
 
 train_loader = torch.utils.data.DataLoader(
-    datasets.FashionMNIST('../data', train=True, download=True,
-                   transform=transforms.ToTensor()),
+    datasets.FashionMNIST('../data', train=True, download=True, transform=transforms.ToTensor()),
     batch_size=BATCH_SIZE, shuffle=True)
 test_loader = torch.utils.data.DataLoader(
     datasets.FashionMNIST('../data', train=False, transform=transforms.ToTensor()),
@@ -79,6 +80,7 @@ test_loader = torch.utils.data.DataLoader(
 def train(epoch):
     model.train()
     train_loss = 0
+    global loss_records
     for batch_idx, (data, _) in enumerate(train_loader):
         data = data.to(device)
         optimizer.zero_grad()
@@ -87,6 +89,7 @@ def train(epoch):
         loss.backward()
         train_loss += loss.item()
         optimizer.step()
+        loss_records["train"].append(loss.item())
         if batch_idx % 10 == 0:
             print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                 epoch, batch_idx * len(data), len(train_loader.dataset),
@@ -100,11 +103,15 @@ def train(epoch):
 def test(epoch):
     model.eval()
     test_loss = 0
+    global loss_records
     with torch.no_grad():
         for i, (data, _) in enumerate(test_loader):
             data = data.to(device)
             recon_batch, mu, logvar = model(data)
-            test_loss += loss_function(recon_batch, data, mu, logvar).item()
+            loss = loss_function(recon_batch, data, mu, logvar)
+            test_loss += loss.item()
+            loss_records["test"].append(loss.item())
+
             if i == 0:
                 n = min(data.size(0), 8)
                 comparison = torch.cat([data[:n],
@@ -126,3 +133,5 @@ if __name__ == "__main__":
             save_image(sample.view(64, 1, 28, 28), './sheet2/results/sample_' + str(epoch) + '.png')
 
     torch.save(model.state_dict(), "./sheet2/modelweights/vae")
+    with open("./sheet2/loss_records_task1.pickle", "wb") as file:
+        pickle.dump(loss_records, file, protocol=pickle.HIGHEST_PROTOCOL)
