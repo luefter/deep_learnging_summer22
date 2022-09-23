@@ -12,14 +12,16 @@ model = VAE()
 
 # -- Task 1 -- #
 # -- plotting reconstruction loss -- #
-with open("./sheet2/loss_records_task1", "rb") as f:
+with open("./sheet2/loss_records_task1.pickle", "rb") as f:
     loss_records = pickle.load(f)
 
 
 def plot_loss(records):
-    fig, (ax1, ax2) = plt.subplots(1, 2)
+    fig, (ax1, ax2) = plt.subplots(1, 2, clear=True)
     ax1.plot(np.arange(len(records["train"])), records["train"], label="train")
     ax2.plot(np.arange(len(records["test"])), records["test"], label="test")
+    fig.savefig("./sheet2/results/loss_records.png")
+    plt.clf()
 
 
 # -- Task 2.1 -- #
@@ -54,11 +56,12 @@ classes = labels_map.values()
 
 # -- plot dimensionality reduced data
 def plot_umap(embeddings):
-    scatter = plt.scatter(embeddings[:0], embeddings[:, 1], c=labels, cmap=matplotlib.colormaps["tab10"])
+    scatter = plt.scatter(embeddings[:, 0], embeddings[:, 1], c=labels, cmap=matplotlib.colormaps["tab10"])
     plt.gca().set_aspect('equal', 'datalim')
     plt.title('UMAP projection of the MNIST dataset', fontsize=24)
     plt.legend(handles=scatter.legend_elements()[0], labels=classes)
-    plt.show()
+    plt.savefig("./sheet2/results/umap.png")
+    plt.show(block=False)
 
 
 # -- Task 2.2 -- #
@@ -87,7 +90,7 @@ def plot_generated(examples, n):
         plt.subplot(1, n, 1 + i)
         plt.axis("off")
         plt.imshow(examples[i, :, :])
-    plt.show()
+    plt.savefig("./sheet2/results/interpolated.png")
 
 
 if __name__ == "__main__":
@@ -104,7 +107,6 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load("./sheet2/modelweights/vae"))
     # generate points
     pts = generate_latent_points(Z_DIM, 2)
-    print(pts)
     # interpolate points
     interpolated = interpolate(pts[0], pts[1])
     # generate image
