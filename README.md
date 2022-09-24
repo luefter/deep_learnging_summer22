@@ -1,0 +1,1 @@
+To run as specific script, for instance sheet3/model.py, enter 'python -m sheet3.model'
