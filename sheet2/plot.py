@@ -99,7 +99,7 @@ if __name__ == "__main__":
 
     # Task 2.1
     print("Task2: dimensionality reduced data")
-    plot_umap(embedding)
+    # plot_umap(embedding)
 
     # Task 2.2
     print("Task2: interpolated images result")
@@ -110,6 +110,6 @@ if __name__ == "__main__":
     # interpolate points
     interpolated = interpolate(pts[0], pts[1])
     # generate image
-    X = model.decode(torch.from_numpy(interpolated))
+    X = model.decode(torch.from_numpy(interpolated,).type(torch.float))
     # plot image
-    plot_generated(X, len(interpolated))
+    plot_generated(X.view(-1,28,28).detach().numpy(), len(interpolated))

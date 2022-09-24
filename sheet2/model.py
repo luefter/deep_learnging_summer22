@@ -132,6 +132,7 @@ if __name__ == "__main__":
             sample = model.decode(sample).cpu()
             save_image(sample.view(64, 1, 28, 28), './sheet2/results/sample_' + str(epoch) + '.png')
 
-    torch.save(model.state_dict(), "./sheet2/modelweights/vae")
+    torch.save(model.state_dict(), f"./sheet2/modelweights/vae_{device}")
     with open("./sheet2/loss_records_task1.pickle", "wb") as file:
         pickle.dump(loss_records, file, protocol=pickle.HIGHEST_PROTOCOL)
+        print(f"model saved in ./sheet2/modelweights/vae_{device}")
