@@ -22,6 +22,12 @@ class FGM:
 
     
     def generate(self,input_image,target_label=None,iterative=False,attack_step_size=0.01):
+        """
+        Returns
+        -------
+        attacked_input_tensor : torch.float
+        iteration steps: int
+        """
         # prepare loss
         loss = nn.CrossEntropyLoss()
 
@@ -35,7 +41,7 @@ class FGM:
         input_tensor.requires_grad = True
 
         # cast labels
-        original_label = self.classifier(torch.unsqueeze(true_image,0))[0].argmax()
+        original_label = self.classifier(torch.unsqueeze(input_tensor,0))[0].argmax()
         target_label = torch.tensor([target_label],dtype=torch.long) if target_label is not None else None
 
         print(self.classifier.training)
