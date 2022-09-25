@@ -15,12 +15,12 @@ test_data = datasets.FashionMNIST(
 )
 
 class FGM:
-    def __init__(self,classifier,attack_step_size=0.5,batch_size=None,transform=None) -> None:
+    def __init__(self,classifier,transform=None) -> None:
         self.classifier = classifier
         self.transform = transform
 
     
-    def generate(self,input_image,target_label=None,iterative=False,attack_step_size=1):
+    def generate(self,input_image,target_label=None,iterative=False,attack_step_size=0.01):
         # prepare loss
         loss = nn.CrossEntropyLoss()
 
@@ -35,21 +35,21 @@ class FGM:
 
         # cast labels
         original_label = model(torch.unsqueeze(true_image,0))[0].argmax()
-        target_label = torch.tensor([target_label],dtype=torch.long) if target_label else None
+        target_label = torch.tensor([target_label],dtype=torch.long) if target_label is not None else None
 
         
         # not targeted
-        if not target_label:
+        if target_label is None:
             if iterative:
                 logger.info("start iterative, untargeted attack")
 
                 # max 100 iterations
-                for _ in range(100):
+                for step in range(100):
                     attacked_input_tensor = self.untargeted_attack(loss,input_tensor,attack_step_size)
                     attacked_input_label = model(torch.unsqueeze(attacked_input_tensor,0))[0].argmax()
                     
                     if attacked_input_label.item() != original_label.item():
-                        return attacked_input_tensor
+                        return attacked_input_tensor,step
                     else:
                         input_tensor = attacked_input_tensor.detach().clone().requires_grad_()
             # not iterative        
@@ -58,31 +58,28 @@ class FGM:
                 attacked_input_tensor = self.untargeted_attack(loss,input_tensor,attack_step_size)
 
         # targeted
-        if target_label:
+        if target_label is not None:
             if iterative:
                 logger.info("start iterative, targeted attack")
-                for i in range(10000):
+                for step in range(10000):
                     attacked_input_tensor = self.targeted_attack(loss,input_tensor,target_label,attack_step_size)
                     attacked_input_label = model(torch.unsqueeze(attacked_input_tensor,0))[0].argmax()
                     
                     if target_label.item() == attacked_input_label.item():
-                        return attacked_input_tensor
+                        return attacked_input_tensor,step
                     else:
                         input_tensor = attacked_input_tensor.detach().clone().requires_grad_()
             else:
                 logger.info("start targeted attack")
                 attacked_input_tensor = self.targeted_attack(loss,input_tensor,target_label,attack_step_size)
 
-
-        return attacked_input_tensor
+        return attacked_input_tensor, 1
 
     
     def untargeted_attack(self,loss,input_tensor,attack_step_size):
         # Calculate loss.
         predicted_tensor = self.classifier(torch.unsqueeze(input_tensor,0))
         predicted_label = torch.unsqueeze(self.classifier(torch.unsqueeze(input_tensor,0))[0].argmax(),0)
-
-
         loss_value = loss(predicted_tensor, predicted_label)
 
         # Zero gradients.
@@ -137,13 +134,16 @@ if __name__ == "__main__":
     # intialize attacker
     fgm = FGM(model)
 
-
-    attacked_input_tensor = fgm.generate(true_image.detach().clone(),target_label=2,iterative=True,attack_step_size=0.2)
+    # apply attack
+    attacked_input_tensor, steps = fgm.generate(true_image.detach().clone(),target_label=0,iterative=True,attack_step_size=0.01)
     
-    
+    # compute label for attacked input tensor
+    model.eval()
     attacked_label = model(torch.unsqueeze(attacked_input_tensor,0))[0].argmax().item()
     logger.info(f"The model predicts the label {attacked_label} for the attacked input")
+    logger.info(f"The adverserial attack has needed {steps} gradient steps")
     
+    # plot results
     diff_image = (attacked_input_tensor - true_image).detach().cpu().numpy()[0]
     attacked_image = attacked_input_tensor.detach().cpu().numpy()[0]
     original_image = true_image.detach().cpu().numpy()[0]
