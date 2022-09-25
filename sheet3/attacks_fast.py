@@ -1,3 +1,4 @@
+from modulefinder import STORE_OPS
 import torch
 from torch import nn
 from torchvision import datasets
@@ -30,14 +31,14 @@ class FGM:
         else:
             input_tensor = input_image
 
-        # record gradients
+        # record gradients for the input vector
         input_tensor.requires_grad = True
 
         # cast labels
-        original_label = model(torch.unsqueeze(true_image,0))[0].argmax()
+        original_label = self.classifier(torch.unsqueeze(true_image,0))[0].argmax()
         target_label = torch.tensor([target_label],dtype=torch.long) if target_label is not None else None
 
-        
+        print(self.classifier.training)
         # not targeted
         if target_label is None:
             if iterative:
@@ -45,9 +46,14 @@ class FGM:
 
                 # max 100 iterations
                 for step in range(100):
-                    attacked_input_tensor = self.untargeted_attack(loss,input_tensor,attack_step_size)
-                    attacked_input_label = model(torch.unsqueeze(attacked_input_tensor,0))[0].argmax()
-                    
+                    attacked_input_tensor = self.classifier.untargeted_attack(loss,input_tensor,attack_step_size)
+
+                    # compute prediction for attacked input tensor
+                    self.classifier.eval()
+                    with torch.no_grad():
+                        attacked_input_label = self.classifier(torch.unsqueeze(attacked_input_tensor,0))[0].argmax()
+                    self.classifier.train()
+
                     if attacked_input_label.item() != original_label.item():
                         return attacked_input_tensor,step
                     else:
@@ -63,7 +69,12 @@ class FGM:
                 logger.info("start iterative, targeted attack")
                 for step in range(10000):
                     attacked_input_tensor = self.targeted_attack(loss,input_tensor,target_label,attack_step_size)
-                    attacked_input_label = model(torch.unsqueeze(attacked_input_tensor,0))[0].argmax()
+                    
+                    # compute prediction for attacked input tensor
+                    self.classifier.eval()
+                    with torch.no_grad():
+                        attacked_input_label = self.classifier(torch.unsqueeze(attacked_input_tensor,0))[0].argmax()
+                    self.classifier.train()
                     
                     if target_label.item() == attacked_input_label.item():
                         return attacked_input_tensor,step
@@ -116,7 +127,7 @@ class FGM:
         input_tensor.data -= attack_step_size * input_tensor.grad.data/c
 
         return input_tensor
-        
+
 if __name__ == "__main__":
     # load model to be attacked
     model = ConvNetwork() 
@@ -133,9 +144,10 @@ if __name__ == "__main__":
 
     # intialize attacker
     fgm = FGM(model)
-
+    target_label = 5
+    
     # apply attack
-    attacked_input_tensor, steps = fgm.generate(true_image.detach().clone(),target_label=0,iterative=True,attack_step_size=0.01)
+    attacked_input_tensor, steps = fgm.generate(true_image.detach().clone(),target_label=target_label,iterative=True,attack_step_size=0.1)
     
     # compute label for attacked input tensor
     model.eval()
@@ -158,5 +170,6 @@ if __name__ == "__main__":
     plt.subplot(1,3,3)
     plt.imshow(diff_image)
     plt.title(f"attack image filter")
+    plt.savefig(f"./sheet3/results/fgsm_{true_label}_{target_label}_steps_{steps}.png")
 
-    plt.show()
+    
