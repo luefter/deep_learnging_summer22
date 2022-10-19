@@ -10,28 +10,8 @@ from torch.utils.data import Dataset
 from torchvision import datasets
 from torchvision.transforms import ToTensor
 import matplotlib.pyplot as plt
-
+from tqdm import tqdm
 from torch.nn import Conv2d, MaxPool2d
-
-
-# define network
-class NeuralNetwork(nn.Module):
-    def __init__(self):
-        super(NeuralNetwork, self).__init__()
-        self.flatten = nn.Flatten()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(28 * 28, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512, 10),
-        )
-
-    def forward(self, x):
-        x = self.flatten(x)
-        logits = self.linear_relu_stack(x)
-        return logits
-
 
 class ConvNetwork(nn.Module):
     def __init__(self):
@@ -75,27 +55,6 @@ class ConvNetwork(nn.Module):
 
         return output
 
-
-# define network
-class NeuralNetwork(nn.Module):
-    def __init__(self):
-        super(NeuralNetwork, self).__init__()
-
-        self.flatten = nn.Flatten()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(28 * 28, 512),
-            nn.ReLU(),
-            nn.Linear(512, 512),
-            nn.ReLU(),
-            nn.Linear(512, 10),
-        )
-
-    def forward(self, x):
-        x = self.flatten(x)
-        logits = self.linear_relu_stack(x)
-        return logits
-
-
 labels_map = {
     0: "T-Shirt",
     1: "Trouser",
@@ -110,24 +69,12 @@ labels_map = {
 }
 
 
-# figure = plt.figure(figsize=(8, 8))
-# cols, rows = 3, 3
-# for i in range(1, cols * rows + 1):
-#     sample_idx = torch.randint(len(training_data), size=(1,)).item()
-#     img, label = training_data[sample_idx]
-#     figure.add_subplot(rows, cols, i)
-#     plt.title(labels_map[label])
-#     plt.axis("off")
-#     plt.imshow(img.squeeze(), cmap="gray")
-# plt.show()
-
-
 def train_loop(train_dataloader, test_dataloader, model, loss_fn, optimizer,track_test_error=True):
     model.train()
     size = len(train_dataloader.dataset)
     train_loss_records = []
     test_loss_records = []
-    for batch, (X, y) in enumerate(train_dataloader):
+    for batch, (X, y) in enumerate(tqdm(train_dataloader,total=len(train_dataloader),position=0, leave=True)):
         # Load into device
         X, y = X.to(device), y.to(device)
 
@@ -142,10 +89,10 @@ def train_loop(train_dataloader, test_dataloader, model, loss_fn, optimizer,trac
 
         train_loss_records.append(loss.item())
 
-        if track_test_error:
+        if track_test_error & ((batch * len(X)) % 512 == 0):
             test_loss_records.append(test_loop(test_dataloader, model, loss_fn))
 
-        if batch * len(X) % 1280 == 0:
+        if (batch * len(X)) % 1280 == 0:
             loss, current = loss.item(), batch * len(X)
             print(f"loss: {loss:>7f}  [{current:>5d}/{size:>5d}]")
 
@@ -217,6 +164,13 @@ if __name__ == "__main__":
 
         model = ConvNetwork().to(device)
         optimizer = optimizer(model.parameters(), lr=learning_rate)
+
+        if opt_name == "SGD":
+            batch_size = 1
+            train_dataloader = DataLoader(training_data, batch_size=batch_size)
+        else:
+            batch_size = 64
+            train_dataloader = DataLoader(training_data, batch_size=batch_size)
 
         for epoch in range(epochs):
             print(f"Epoch {epoch + 1}\n-------------------------------")
